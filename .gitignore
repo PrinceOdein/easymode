@@ -24,3 +24,6 @@ dist-ssr
 *.sw?
 
 .env
+
+supabase/functions/insert-user/.env
+supabase/functions/.temp

@@ -1,62 +1,92 @@
-import { useState, useEffect } from "react";
+// src/pages/Dashboard.tsx
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
-import { useTambo } from "@tambo-ai/react";
-import { lingo } from "@/lib/lingoClient"; // optional: only if you're using Lingo.dev
+
+interface Profile {
+  id: string;
+  email: string;
+  created_at: string;
+}
 
 export default function Dashboard() {
-  // 👤 Supabase: user info
-  const [user, setUser] = useState<any>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
-  // 🧠 Tambo: get the user's preferred UI mode
-  const { uiMode } = useTambo({
-    role: "beginner",     // or "expert" based on user settings
-    device: "desktop",    // or detect from screen size
-  });
-
+  // ─────────────────────────────────────────────
+  // 1. Fetch auth user → then fetch row in public.users
+  // ─────────────────────────────────────────────
   useEffect(() => {
-    // 🔐 Fetch the currently logged-in user from Supabase
-    const fetchUser = async () => {
-      const { data, error } = await supabase.auth.getUser();
-      if (data?.user) {
-        setUser(data.user);
-      } else {
-        console.error("Failed to fetch user:", error);
+    const loadProfile = async () => {
+      const { data: authData, error: authErr } = await supabase.auth.getUser();
+      if (authErr || !authData?.user) {
+        console.error("Not logged in", authErr);
+        navigate("/");          // Back to login if no session
+        return;
       }
+
+      // Query your users table for this user's row
+      const { data: row, error: rowErr } = await supabase
+        .from("users")
+        .select("*")
+        .eq("id", authData.user.id)
+        .single();
+
+      if (rowErr) {
+        console.error("DB fetch error:", rowErr.message);
+      } else {
+        setProfile(row as Profile);
+      }
+      setLoading(false);
     };
 
-    fetchUser();
-  }, []);
+    loadProfile();
+  }, [navigate]);
+
+  // ─────────────────────────────────────────────
+  // 2. Sign‑out helper
+  // ─────────────────────────────────────────────
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate("/");
+  };
+
+  // ─────────────────────────────────────────────
+  // 3. Render
+  // ─────────────────────────────────────────────
+  if (loading) return <p className="p-10 text-white">Loading profile…</p>;
+
+  if (!profile)
+    return (
+      <p className="p-10 text-red-400">
+        Could not find your profile. Try logging out and back in.
+      </p>
+    );
 
   return (
-    <div style={{ padding: "2rem" }}>
-      <h1>Welcome to EasyMode</h1>
-      
-      {user ? (
-        <p>Hello, {user.email}</p>
-      ) : (
-        <p>Loading user info...</p>
-      )}
+    <div className="min-h-screen px-8 py-12 text-white">
+      <h1 className="text-3xl font-bold mb-4">Dashboard</h1>
 
-      <p>
-        <strong>Interface Mode:</strong> {uiMode || "loading..."}
-      </p>
+      <div className="space-y-2 bg-gray-800 p-6 rounded-lg max-w-md">
+        <p>
+          <span className="font-semibold">Email:</span> {profile.email}
+        </p>
+        <p>
+          <span className="font-semibold">User ID:</span> {profile.id}
+        </p>
+        <p>
+          <span className="font-semibold">Joined:</span>{" "}
+          {new Date(profile.created_at).toLocaleDateString()}
+        </p>
+      </div>
 
-      {/* 🧪 Optional: test Lingo.dev */}
-      {/* <p>Translation: {await lingo.translate("Start Here", "fr")}</p> */}
-
-      {uiMode === "simple" ? (
-        <div style={{ border: "1px solid #ddd", padding: "1rem", marginTop: "1rem" }}>
-          <h2>🧒 Beginner Interface</h2>
-          <p>This layout is simplified for easier use.</p>
-          {/* Add beginner-friendly UI components here */}
-        </div>
-      ) : (
-        <div style={{ border: "1px solid #444", padding: "1rem", marginTop: "1rem" }}>
-          <h2>🧠 Advanced Interface</h2>
-          <p>This layout has all features available.</p>
-          {/* Add full-featured components here */}
-        </div>
-      )}
+      <button
+        onClick={handleLogout}
+        className="mt-8 px-5 py-2 bg-red-600 hover:bg-red-700 rounded"
+      >
+        Log out
+      </button>
     </div>
   );
 }
