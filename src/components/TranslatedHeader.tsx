@@ -1,16 +1,12 @@
-// src/components/TranslatedHeader.tsx
-import { useEffect, useState } from "react";
-import { lingo } from "@/lib/lingoClient";
+import { useTambo } from "@tambo-ai/react";
 
 export default function TranslatedHeader() {
-  const [text, setText] = useState("...");
+  const tambo = useTambo();
 
-  useEffect(() => {
-    lingo.localizeText("Welcome to EasyMode", {
-      targetLocale: "pcm"  // Pidgin
-    }).then(r => setText(r))
-      .catch(() => setText("Welcome to EasyMode"));
-  }, []);
+  return (
+    <h1 className="text-3xl font-bold text-center mb-6">
+      {(tambo as any).t("Welcome to EasyMode")} 🎉
 
-  return <h1>{text}</h1>;
+    </h1>
+  );
 }
